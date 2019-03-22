@@ -1,7 +1,11 @@
 package com.conveyal.taui.models;
 
 import com.conveyal.r5.analyst.scenario.AddTrips;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -10,6 +14,7 @@ import java.util.stream.Collectors;
  */
 public class AddTripPattern extends Modification {
     public static final String type = "add-trip-pattern";
+    private static final Logger LOG = LoggerFactory.getLogger(AddTripPattern.class);
     public String getType() {
         return type;
     }
@@ -36,7 +41,7 @@ public class AddTripPattern extends Modification {
 
             // Get hop times
             pt.dwellTimes = ModificationStop.getDwellTimes(stops, this.dwellTimes, dwellTime);
-            pt.hopTimes = ModificationStop.getHopTimes(stops, this.segmentSpeeds);
+            pt.hopTimes = ModificationStop.getHopTimes(stops);
 
             return pt;
         }
@@ -45,11 +50,23 @@ public class AddTripPattern extends Modification {
     public AddTrips toR5 () {
         AddTrips at = new AddTrips();
         at.comment = name;
+        LOG.info(name);
 
         at.bidirectional = bidirectional;
+        at.frequencies = new ArrayList<>();
 
-        List<ModificationStop> stops = ModificationStop.getStopsFromSegments(segments);
-        at.frequencies = timetables.stream().map(tt -> tt.toR5(stops)).collect(Collectors.toList());
+        List<ModificationStop> stops = null;
+        for (int i = 0; i < timetables.size(); i++) {
+            Timetable tt = timetables.get(i);
+            stops = ModificationStop.getStopsFromSegments(segments, tt.segmentSpeeds);
+            AddTrips.PatternTimetable pt = tt.toR5(stops);
+            at.frequencies.add(pt);
+            LOG.info(name);
+            LOG.info(Arrays.toString(pt.hopTimes));
+            LOG.info(String.valueOf(Arrays.stream(pt.hopTimes).sum()));
+        }
+
+        // Values for stop spec are not affected by time table segment speeds
         at.stops = ModificationStop.toStopSpecs(stops);
 
         return at;
